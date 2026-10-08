@@ -50,7 +50,17 @@ const healthInterval = setInterval(async () => {
 healthInterval.unref();
 
 // API Routes
+app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
+
+// Auth Page Routes
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'signup.html'));
+});
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {

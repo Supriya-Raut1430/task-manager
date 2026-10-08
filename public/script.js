@@ -816,9 +816,63 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==========================================
-  // 12. App Bootstrapping
+  // 12. User Authentication State in Dashboard
+  // ==========================================
+  const userProfileWidget = document.getElementById('userProfileWidget');
+
+  const updateUserWidgetUI = () => {
+    if (!userProfileWidget) return;
+
+    const rawUser = localStorage.getItem('taskflow_user');
+    if (!rawUser) {
+      userProfileWidget.innerHTML = `
+        <a href="/login" id="btnHeaderAuth" class="btn-header-auth" title="Sign In to your account">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span>Sign In</span>
+        </a>
+      `;
+      return;
+    }
+
+    try {
+      const user = JSON.parse(rawUser);
+      const displayName = user.fullName || user.email?.split('@')[0] || 'User';
+      const initial = displayName.charAt(0).toUpperCase();
+
+      userProfileWidget.innerHTML = `
+        <div class="user-badge" title="Logged in as ${escapeHtml(user.email || displayName)}">
+          <div class="user-avatar">${escapeHtml(initial)}</div>
+          <span>${escapeHtml(displayName)}</span>
+        </div>
+        <button id="btnHeaderLogout" class="btn-header-logout" title="Log Out">Log Out</button>
+      `;
+
+      const btnLogout = document.getElementById('btnHeaderLogout');
+      if (btnLogout) {
+        btnLogout.addEventListener('click', async () => {
+          try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+          } catch (_) {}
+          localStorage.removeItem('taskflow_user');
+          localStorage.removeItem('taskflow_token');
+          showToast('Logged out successfully.', 'info');
+          updateUserWidgetUI();
+        });
+      }
+    } catch (_) {
+      localStorage.removeItem('taskflow_user');
+      updateUserWidgetUI();
+    }
+  };
+
+  // ==========================================
+  // 13. App Bootstrapping
   // ==========================================
   initTheme();
+  updateUserWidgetUI();
   populateCategoryDropdowns();
   checkDatabaseHealth();
   fetchTasksAndStats();
