@@ -1,23 +1,8 @@
 /**
  * TaskFlow — Client-side Authentication Script (public/auth.js)
  * Manages form validation, theme switching, password toggles,
- * and direct Supabase Auth (client-side, no backend required).
+ * and communication with /api/auth endpoints (Vercel serverless functions).
  */
-
-// ============================================================
-// Supabase Client Initialization (direct browser auth)
-// ============================================================
-const SUPABASE_URL = 'https://hlhfkgvzvqexwiuijdcz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhsaGZrZ3Z6dnFleHdpdWlqZGN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzNjU4ODgsImV4cCI6MjEwNjk0MTg4OH0.34CVNCk3P7bAE2ky4r4oLlOMzT35n7aaIzFZqbEVRLE';
-
-let _supabase = null;
-const getSupabase = () => {
-  if (_supabase) return _supabase;
-  if (typeof window !== 'undefined' && window.supabase && window.supabase.createClient) {
-    _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-  return _supabase;
-};
 
 document.addEventListener('DOMContentLoaded', () => {
   // ========================================================================
@@ -201,30 +186,24 @@ document.addEventListener('DOMContentLoaded', () => {
       setSubmitting(true, 'Sign In');
 
       try {
-        const sb = getSupabase();
-        if (!sb) throw new Error('Authentication service unavailable. Please refresh and try again.');
-
-        const { data, error } = await sb.auth.signInWithPassword({
-          email: emailVal,
-          password: pwdVal
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailVal, password: pwdVal })
         });
 
-        if (error) {
-          throw new Error(error.message || 'Invalid email or password.');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Invalid email or password.');
         }
 
         // Store session in localStorage
-        const user = data.user;
-        const session = data.session;
-        const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-
-        localStorage.setItem('taskflow_user', JSON.stringify({
-          id: user.id,
-          email: user.email,
-          fullName: displayName
-        }));
-        if (session?.access_token) {
-          localStorage.setItem('taskflow_token', session.access_token);
+        if (result.data) {
+          localStorage.setItem('taskflow_user', JSON.stringify(result.data.user));
+          if (result.data.token) {
+            localStorage.setItem('taskflow_token', result.data.token);
+          }
         }
 
         showAlert('Login successful! Redirecting to dashboard...', 'success');
@@ -293,43 +272,30 @@ document.addEventListener('DOMContentLoaded', () => {
       setSubmitting(true, 'Create Account');
 
       try {
-        const sb = getSupabase();
-        if (!sb) throw new Error('Authentication service unavailable. Please refresh and try again.');
-
-        const { data, error } = await sb.auth.signUp({
-          email: emailVal,
-          password: pwdVal,
-          options: {
-            data: {
-              full_name: nameVal,
-              name: nameVal
-            }
-          }
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: nameVal,
+            email: emailVal,
+            password: pwdVal
+          })
         });
 
-        if (error) {
-          throw new Error(error.message || 'Failed to create account.');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to create account.');
         }
 
-        const user = data.user;
-        const session = data.session;
-        const displayName = nameVal || user?.email?.split('@')[0] || 'User';
-
-        if (user) {
-          localStorage.setItem('taskflow_user', JSON.stringify({
-            id: user.id,
-            email: user.email,
-            fullName: displayName
-          }));
-          if (session?.access_token) {
-            localStorage.setItem('taskflow_token', session.access_token);
+        if (result.data && result.data.user) {
+          localStorage.setItem('taskflow_user', JSON.stringify(result.data.user));
+          if (result.data.token) {
+            localStorage.setItem('taskflow_token', result.data.token);
           }
         }
 
-        const msg = session
-          ? 'Account created successfully! Redirecting...'
-          : 'Account created! Please check your email for a confirmation link.';
-        showAlert(msg, 'success');
+        showAlert(result.message || 'Account created successfully! Redirecting...', 'success');
 
         setTimeout(() => {
           window.location.href = '/';
